@@ -12,6 +12,7 @@ interactionMatrix = np.array([[.3,.2,.2,.2,.2,.2],[.2,.3,.2,.2,.2,.2],[.2,.2,.3,
 
 Additional information can be found in the methods. 
 '''
+saveFolder = 'Updated/SavePath/'
 
 import sys
 import os
@@ -22,9 +23,9 @@ import ast
 import pandas as pd
 import math
 
-from LEBondUpdater import bondUpdater
-
 sys.path.append("C:\Shared\polychrom-shared")
+sys.path.append("C:\Shared\polychrom-shared\Simulations")
+from LEBondUpdater import bondUpdater
 import polychrom
 from polychrom.starting_conformations import grow_cubic
 from polychrom.hdf5_format import HDF5Reporter, list_URIs, load_URI, load_hdf5_file
@@ -45,19 +46,20 @@ M = 100  # Replicate polymers
 N = N1 * M # number of monomers in the full simulation 
 LEFNum =0
 LIFETIME = 100  # Not used, kept here to observe parallele structure and generality. 
-ctcfSites = np.array([0 1000]) # Not used, kept here to observe parallele structure and generality. 
+ctcfSites = np.array([0,1000]) # Not used, kept here to observe parallele structure and generality. 
 nCTCF = np.shape(ctcfSites)[0] # Not used, kept here to observe parallele structure and generality. 
 ctcfDir = np.zeros(nCTCF) # 0 is bidirectional, 1 is right 2 is left.  Not used, kept here to observe parallele structure and generality. 
 ctcfCapture = 0.99*np.ones(nCTCF) #  Not used, kept here to observe parallele structure and generality. 
 ctcfRelease =0.01*np.ones(nCTCF)  # % Not used, kept here to observe parallele structure and generality. 
+loadProb = 0  # not used, -- keep cohesin loading probability uniform
 interactionMatrix = np.array([[.3,.2,.2,.2,.2,.2],[.2,.3,.2,.2,.2,.2],[.2,.2,.3,.2,.2,.2],[.2,.2,.2,.3,.2,.2],[.2,.2,.2,.2,.3,.2],[.2,.2,.2,.2,.2,.8]])  # Weak TADs
 # interactionMatrix = np.array([[.3,0,0,0,0,0],[0,.3,0,0,0,0],[0,0,.3,0,0,0],[0,0,0,.3,0,0],[0,0,0,0,.3,0],[0,0,0,0,0,.8]])  # Strong TADs
 # interactionMatrix = np.array([[.3,0,0,0,0,0],[0,.3,0,0,0,0],[0,0,.3,0,0,0],[0,0,0,.3,0,0],[0,0,0,0,.3,0],[0,0,0,0,0,.5]])  # Weak E-clustering
 # interactionMatrix = np.array([[.3,0,0,0,0,0],[0,.3,0,0,0,0],[0,0,.3,0,0,0],[0,0,0,.3,0,0],[0,0,0,0,.3,0],[0,0,0,0,0,1.1]])  # Strong E-clustering
-saveFolder = 'UpdateMe/Path/to/saveData/'
+
 
 # specify TADs
-oneChainMonomerTypes = np.zeros(N1)
+oneChainMonomerTypes = np.zeros(N1).astype(int)
 oneChainMonomerTypes[0:200] = 0
 oneChainMonomerTypes[200:400] = 1
 oneChainMonomerTypes[400:600] = 2
@@ -69,6 +71,11 @@ oneChainMonomerTypes[400-w:400+w] = 5
 oneChainMonomerTypes[600-w:600+w] = 5
 oneChainMonomerTypes[800-w:800+w] = 5
 
+# load prob
+if loadProb == 0:
+    loadProb = np.ones([1,N1])  # uniform loading probability
+    loadProb = numpy.matlib.repmat(loadProb,1,M) # need to replicate and renormalize
+    loadProb = loadProb/np.sum(loadProb) 
 
 if len(oneChainMonomerTypes) != N1:
     oneChainMonomerTypes = np.zeros(N1).astype(int)
@@ -92,7 +99,7 @@ restartSimulationEveryBlocks = 100
 # (this part is just kept to make it easy to add back in the loop extrusion if desired)
 # ======
 # 1D extrusion (not used, kept to show symmetry in the code construction and generalizability. 
-import polychrom.lib.extrusion1D as ex1D # 1D classes 
+import polychrom.lib.extrusion1Dv2 as ex1D # 1D classes 
 ctcfLeftRelease = {}
 ctcfRightRelease = {}
 ctcfLeftCapture = {}
@@ -127,7 +134,7 @@ occupied[0] = 1
 occupied[-1] = 1 
 cohesins = []
 for i in range(LEFNum):
-    ex1D.loadOneFromDist(cohesins,occupied, args) # load the cohesins 
+    ex1D.loadOneFromDist(cohesins,occupied, args,loadProb) # load the cohesins 
 with h5py.File(lefPosFile, mode='w') as myfile:
     dset = myfile.create_dataset("positions", 
                                  shape=(trajectoryLength, LEFNum, 2), 

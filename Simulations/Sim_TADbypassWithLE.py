@@ -16,9 +16,10 @@ import ast
 import pandas as pd
 import math
 
-from LEBondUpdater import bondUpdater
-
+saveFolder = 'Updated/SavePath/'
 sys.path.append("C:\Shared\polychrom-shared")
+sys.path.append("C:\Shared\polychrom-shared\Simulations")
+from LEBondUpdater import bondUpdater
 import polychrom
 from polychrom.starting_conformations import grow_cubic
 from polychrom.hdf5_format import HDF5Reporter, list_URIs, load_URI, load_hdf5_file
@@ -38,19 +39,27 @@ N1 = 1000 # Number of monomers in the polymer
 M = 100  # Replicate polymers 
 N = N1 * M # number of monomers in the full simulation 
 LIFETIME = 200  # LEF Lifetime (varied between 100 and 200)
+SEPARATION = 200
 ctcfSites = np.array([0,200,400,600,800,1000]) #
 nCTCF = np.shape(ctcfSites)[0] # number of CTCF sites
 ctcfDir = np.zeros(nCTCF) # 0 is bidirectional, 1 is right 2 is left.    
 ctcfCapture = 0.99*np.ones(nCTCF) #  0.99, 0.5, or 0.18
 ctcfRelease =0.01*np.ones(nCTCF)  # % setting this to zeros will allow TADs to form with lower capture probabilities.
-interactionMatrix = np.array([0,0],[0,0]])  # Not Used, pet to show parallel structure. 
-oneChainMonomerTypes = np.zeros(N1) # Not Used, kept to show parallel structure. 
-saveFolder = 'UpdateMe/Path/to/saveData/'
+loadProb = 0 # uniform load probability
+interactionMatrix = np.array([[0,0],[0,0]])  # Not Used, pet to show parallel structure. 
+oneChainMonomerTypes = np.zeros(N1).astype(int) # Not Used, kept to show parallel structure. 
+
 
 
 if len(oneChainMonomerTypes) != N1:
     oneChainMonomerTypes = np.zeros(N1).astype(int)
 
+# load prob
+if loadProb == 0:
+    loadProb = np.ones([1,N1])  # uniform loading probability
+    loadProb = numpy.matlib.repmat(loadProb,1,M) # need to replicate and renormalize
+    loadProb = loadProb/np.sum(loadProb) 
+    
 if not os.path.exists(saveFolder):
     os.mkdir(saveFolder)
 
@@ -72,7 +81,7 @@ restartSimulationEveryBlocks = 100
 # (this part is just kept to make it easy to add back in the loop extrusion if desired)
 # ======
 # 1D extrusion (not used, kept to show symmetry in the code construction and generalizability. 
-import polychrom.lib.extrusion1D as ex1D # 1D classes 
+import polychrom.lib.extrusion1Dv2 as ex1D # 1D classes 
 ctcfLeftRelease = {}
 ctcfRightRelease = {}
 ctcfLeftCapture = {}
@@ -107,7 +116,7 @@ occupied[0] = 1
 occupied[-1] = 1 
 cohesins = []
 for i in range(LEFNum):
-    ex1D.loadOneFromDist(cohesins,occupied, args) # load the cohesins 
+    ex1D.loadOneFromDist(cohesins,occupied, args,loadProb) # load the cohesins 
 with h5py.File(lefPosFile, mode='w') as myfile:
     dset = myfile.create_dataset("positions", 
                                  shape=(trajectoryLength, LEFNum, 2), 
